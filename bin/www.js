@@ -10,7 +10,13 @@ const server = app.listen(app.get('port'), () => {
 });
 
 // Sync database
-sequelize.sync();
+sequelize.sync()
+.then(() => {
+    console.log(`Your database is in sync with the sequelize models.`);
+}).catch( (err) => {
+    console.log(`Error syncing the database with the sequelize models:
+    ${err}`);
+});
 
 // Test the connection to the database:
 (async function () {

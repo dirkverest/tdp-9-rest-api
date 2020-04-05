@@ -1,67 +1,142 @@
 const express = require('express');
 const router = express.Router();
+const { check, validationResult } = require('express-validator');
+const auth = require('basic-auth');
+const {hash} = require('bcryptjs');
+const {User, Course} = require('../db/models');
+
+// Parse JSON 
+router.use(express.json());
+
+/**
+ * Async Await Handler
+ *
+ * @param {function} callBack - Sequelize query
+ * @returns {[return type]} [documents the function's return value]
+ */
+ function asyncHandler(callBack) {
+     return async (req, res, next) => {
+        try {
+            await callBack(req, res, next);
+        } catch (err) {
+            res.status(500).json({ ERROR: `${err}` });
+        };
+     };
+ };
+
+
+
+/**
+ * Authenticate User
+ *
+ * @param {[parameter type]} param1 - [parameter description]
+ * @param {[param type]} param2 - [parameter description]
+ * @returns {[return type]} [documents the function's return value]
+ */
+
+const authenticateUser = (req, res, next) => {
+    let errorMessage = NULL;
+    
+};
+
+
 
 
 // USER ROUTES:
 
 // TODO : GET /api/users 200 - Returns the currently authenticated user
 // GET Users: Returns the currently authenticated user
-router.get('/users', (req, res) => {
-    res.json({
-        message: 'Returns the currently authenticated user',
-    });
-});
+router.get('/users', asyncHandler( async (req, res) => {
+    res.json(
+        await User.findAll({
+            attributes: ['id', 'firstName', 'lastName', 'emailAddress', 'password']
+        })
+    );
+}));
 
-// TODO : POST /api/users 201 - Creates a user, sets the Location header to "/", and returns no content
-// POST Users: Creates new user
-router.post('/users', (req, res) => {
-    res.json({
-        message: 'Create new user',
-    });
-});
+// TODO : Validate input
+// POST Users: Hash password and creates new user
+router.post('/users', asyncHandler( async (req, res) => {
+    const user = req.body;
+    user.password = await hash(user.password, 10);
+    await User.create(user);
+    res.status(201).location('/').end();
+}));
+
+
 
 
 // COURSE ROUTES:
 
-// TODO : GET /api/courses 200 - Returns a list of courses (including the user that owns each course)
-// GET Course : Returns all courses
-router.get('/courses', (req, res) => {
-    res.json({
-        message: 'Returns list of courses',
-    });
-});
+// GET Course : Returns all courses and the associated user
+router.get('/courses', asyncHandler( async (req, res) => {
+    res.json(
+        await Course.findAll({
+            attributes: ['id', 'title', 'description', 'estimatedTime', 'materialsNeeded'],
+            include: [{
+                model: User,
+                attributes: ['id', 'firstName', 'lastName', 'emailAddress']
+            }]
+        })
+    );
+}));
 
-// TODO : GET /api/courses/:id 200 - Returns a the course (including the user that owns the course) for the provided course ID
-// GET Course : Returns course with :id
-router.get('/courses/:id', (req, res) => {
-    res.json({
-        message: `Returns list of course with ${req.params.id}`,
-    });
-});
 
-// TODO : POST /api/courses 201 - Creates a course, sets the Location header to the URI for the course, and returns no content
+// GET Course : If course with id exists, returns course with associated user
+router.get('/courses/:id', asyncHandler( async (req, res) => {
+    const course = 
+        await Course.findByPk(
+            req.params.id,
+            {
+            attributes: ['id', 'title', 'description', 'estimatedTime', 'materialsNeeded'],
+            include: [{
+                model: User,
+                attributes: ['id', 'firstName', 'lastName', 'emailAddress']
+            }]
+        }); 
+    if (course) {
+        res.json(course);
+    } else {
+        res.status(404).json({ message: `Course with id: ${req.params.id} not found.`});
+    };
+}));
+
+// TODO : Validate input
 // POST Course : Create new course
-router.post('/courses', (req, res) => {
-    res.json({
-        message: `Create course`,
-    });
-});
+router.post('/courses', asyncHandler( async (req, res) => {
+    // Check for validation errors.
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(422).json({ errors: errors.array() });
+      }
 
-// TODO : PUT /api/courses/:id 204 - Updates a course and returns no content
-// PUT Course : Update course
-router.put('/courses/:id', (req, res) => {
-    res.json({
-        message: `Update course`,
-    });
-});
 
-// TODO : DELETE /api/courses/:id 204 - Deletes a course and returns no content
+    let newCourse = await Course.create(req.body);
+    res.status(201).location('/courses/' + newCourse.id).end();
+}));
+
+// TODO : Validate input
 // PUT Course : Update course
-router.delete('/courses/:id', (req, res) => {
-    res.json({
-        message: `Delete course`,
-    });
-});
+router.put('/courses/:id', asyncHandler( async (req, res) => {
+    const updateCourse = await Course.findByPk(req.params.id);
+    if (updateCourse) {
+        updateCourse.update(req.body);
+        res.status(204).end();
+    } else {
+        res.status(404).json({ message: `Course with id: ${req.params.id} was not found.`});
+    }
+}));
+
+// DELETE Course : If course with id exists, delete course
+router.delete('/courses/:id', asyncHandler( async (req, res) => {
+    const deleteCourse = await Course.findByPk(req.params.id);
+    if (deleteCourse) {
+        deleteCourse.destroy();
+        res.status(204).end();
+    } else {
+        res.status(404).json({ message: `Course with id: ${req.params.id} was not found.`});
+    }
+}));
 
 
 module.exports = router;
