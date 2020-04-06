@@ -44,8 +44,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// set our port: moved to bin
-// start listening on our port: moved to bin
+// set our port: moved to ./bin/www
+// start listening on our port: moved to ./bin/www
 
 
 module.exports = app;

@@ -29,6 +29,7 @@ module.exports = (sequelize) => {
         timestamps: true
     });
 
+    // Define associations between Course and User
     Course.associate = (models) => {
         Course.belongsTo(models.User, {
             foreignKey: {

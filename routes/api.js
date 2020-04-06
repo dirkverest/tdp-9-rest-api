@@ -11,8 +11,8 @@ router.use(express.json());
 /**
  * Async Await Handler
  *
- * @param {function} callBack - Sequelize query
- * @returns {[return type]} [documents the function's return value]
+ * @param {function} callBack - Anonymous middleware function for route handling
+ * @returns {[return type]} Response or next
  */
  function asyncHandler(callBack) {
      return async (req, res, next) => {
@@ -28,36 +28,28 @@ router.use(express.json());
      };
  };
 
-
-
 /**
- * Authenticate User
+ * Middleware function: Arrow Function Expression to Authenticate User
  *
- * @param {[parameter type]} param1 - [parameter description]
- * @param {[param type]} param2 - [parameter description]
- * @returns {[return type]} [documents the function's return value]
+ * @param {object} req - HTTP request
+ * @param {object} res - Response to HTTP request
+ * @param {function} next - next middleware function
+ * @returns {object} Request object with validated user or errorMessage variable with error message object
  */
 
-async function isRegisteredUser(user) {
-    await User.findOne({
-        where: {
-            emailAddress: user.name.toLowerCase()
-        }
-    })
-};
-
-
 const authenticateUser = asyncHandler( async (req, res, next) => {
+
     let errorMessage = null;
     // Parse the user credentials from Basic Authorization header.
     const credentials = auth(req);
+
     //  If Authorization Header info is availbe
     if (credentials) {
         const validatedUser =
             await User.findOne({
                 attributes: ['id', 'firstName', 'lastName', 'emailAddress', 'password'],
                 where: {
-                    emailAddress: credentials.name
+                    emailAddress: credentials.name.toLowerCase()
                 }
             });
         // If user is registered
@@ -76,32 +68,29 @@ const authenticateUser = asyncHandler( async (req, res, next) => {
         errorMessage = 'No Authorization header found.';
     }
 
+    // If errorMessage respond with error message else continue
     if (errorMessage) {
         // Log warning
         console.warn(errorMessage);
         // Respond with issue
-        res.status(401).json({errorMessage});
+        res.status(401).json({ERROR: errorMessage});
     } else {
         // If authorized call next method
         next();
     }
 });
 
-
-
-
 // USER ROUTES:
 
-// GET Users: Returns the currently authenticated user
+// GET Users: Returns the current authenticated user
 router.get('/users',authenticateUser, asyncHandler( async (req, res) => {
-    res.json(
-        await User.findAll({
-            attributes: ['firstName', 'lastName', 'emailAddress'],
-            where: {
-                emailAddress: req.currentUser.emailAddress
-            }
-        })
-    );
+    const currentUser = await User.findAll({
+        attributes: ['id', 'firstName', 'lastName', 'emailAddress'],
+        where: {
+            emailAddress: req.currentUser.emailAddress
+        }
+    });
+    res.json(currentUser[0]);
 }));
 
 
@@ -121,25 +110,27 @@ router.post('/users',[
         .withMessage('Please enter a valid email.')
         // Validate that the provided email address isn't already associated with an existing user record.
         .custom( async (value) => {
-            const match = await User.findOne({
-                attributes: ['emailAddress'],
-                where: {
-                    emailAddress: value
+            if (value) {
+                const match = await User.findOne({
+                    attributes: ['emailAddress'],
+                    where: {
+                        emailAddress: value.toLowerCase()
+                    }
+                });
+                if (match) {
+                  throw new Error('This email is already registered.');
                 }
-            });
-            if (match) {
-              throw new Error('This email is already registered.');
             }
             return true;
           })
         .withMessage('This email is already registered.'),
     check('password')
         .exists({checkNull: true, checkFalsy: true})
-        .withMessage('Please a password')
+        .withMessage('Please enter a password')
 ], asyncHandler( async (req, res) => {
     const valErrors = validationResult(req);
     if (!valErrors.isEmpty()) {
-        res.status(400).json(valErrors.array().map( (error, index) => {return `Error ${index + 1}: ${error.msg}`}) );
+        res.status(400).json({Errors: valErrors.array().map( (error) => error.msg) });
     } else {
         const user = req.body;
         // Hash password
@@ -150,9 +141,6 @@ router.post('/users',[
         res.status(201).location('/').end();
     };
 }));
-
-
-
 
 // COURSE ROUTES:
 
@@ -168,7 +156,6 @@ router.get('/courses', asyncHandler( async (req, res) => {
         })
     );
 }));
-
 
 // GET Course : If course with id exists, returns course with associated user
 router.get('/courses/:id', asyncHandler( async (req, res) => {
@@ -198,14 +185,13 @@ router.post('/courses',authenticateUser, [
         .exists({ checkNull: true, checkFalsy: true })
         .withMessage('Please provide a description for your course.')
 ], asyncHandler( async (req, res) => {
-
     // If validation errors return errors, else return 201 Created
     const valErrors = validationResult(req);
     if (!valErrors.isEmpty()) {
-        res.status(400).json(valErrors.array().map( (error, index) => {return `Error ${index + 1}: ${error.msg}`}) );
+        res.status(400).json({errors: valErrors.array().map( (error) => error.msg) });
     } else {
         const newCourseInput = req.body;
-        // Set user ID to current user
+        // Set user ID to current user so they can not post under different id
         newCourseInput.userId = req.currentUser.id;
         // Create new course record
         let newCourse = await Course.create(req.body);
@@ -216,6 +202,7 @@ router.post('/courses',authenticateUser, [
 
 // PUT Course : Update course
 router.put('/courses/:id',authenticateUser, [
+    // Only check if JSON contains attribute
     check('title')
         .if(check('title').exists()).exists({ checkNull: true, checkFalsy: true })
         .withMessage('Please provide a title for your course.'),
@@ -223,14 +210,18 @@ router.put('/courses/:id',authenticateUser, [
         .if(check('description').exists()).exists({ checkNull: true, checkFalsy: true })
         .withMessage('Please provide a description for your course.')
 ], asyncHandler( async (req, res) => {
+    const valErrors = validationResult(req);
     const updateCourse = await Course.findByPk(req.params.id);
+    // If body is empty, return missing data error
+    if (JSON.stringify(req.body) === "{}" || JSON.stringify(req.body) === "") {
+        res.status(400).json({ errors: 'Your request body is empty.' });
+    }
     // If course exists, else return 404 error
     if (updateCourse.userId === req.currentUser.id) {
         if (updateCourse) {
             // If validation errors return errors, else return 204 no content
-            const valErrors = validationResult(req);
             if (!valErrors.isEmpty()) {
-                res.status(400).json(valErrors.array().map( (error, index) => {return `Error ${index + 1}: ${error.msg}`}) );
+                res.status(400).json({ errors: valErrors.array().map( (error) => error.msg) });
             } else {
                 updateCourse.update(req.body);
                 res.status(204).end();
@@ -239,7 +230,7 @@ router.put('/courses/:id',authenticateUser, [
             res.status(404).json({ message: `Course with id: ${req.params.id} was not found.`});
         }
     } else {
-        res.status(401).json({ message: `Sorry ${req.currentUser.firstName}, you can only update your own courses.`});
+        res.status(403).json({ message: `Sorry ${req.currentUser.firstName}, you can only update your own courses.`});
     }
 }));
 
@@ -254,7 +245,7 @@ router.delete('/courses/:id',authenticateUser, asyncHandler( async (req, res) =>
             res.status(404).json({ message: `Course with id: ${req.params.id} was not found.`});
         }
     } else {
-        res.status(401).json({ message: `Sorry ${req.currentUser.firstName}, you can only deleter your own courses.`});
+        res.status(403).json({ message: `Sorry ${req.currentUser.firstName}, you can only deleter your own courses.`});
     }
 }));
 

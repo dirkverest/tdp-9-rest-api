@@ -13,22 +13,20 @@ const path = require('path');
 const basename = path.basename(__filename);
 // Database object:
 const db = {};
+// Define default model parameters: 
+const modelDefault = { 
+  define: {
+    allowNull: false,
+  }
+};
 
 
 // Instantiate an instance of the Sequelize class to use fsjstd-restapi.db
 let sequelize;
 if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config, {
-    define: {
-      allowNull: false,
-    }
-  });
+  sequelize = new Sequelize(process.env[config.use_env_variable], config, modelDefault);
 } else {
-  sequelize = new Sequelize(config.database, config.username, config.password, config), {
-    define: {
-      allowNull: false,
-    }
-  };
+  sequelize = new Sequelize(config.database, config.username, config.password, config, modelDefault);
 }
 
 // Check this scripts directory for table models
