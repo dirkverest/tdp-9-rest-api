@@ -56,6 +56,7 @@ Added a db folder to include all sequelize related files. To me it feels more og
 Used express-validator instead of sequelize validation. Validating before database submission seems faster and more logical.
 
 ## PUT /api/courses/:id 204 - Updates a course and returns no content
+REMOVED OPTION TO BE ABLE TO SUBMIT ONLY A TITLE OR DESCRIPTION, TO MEET PROJECT GUIDELINES
 The Postman tests imply you always have to update the title and description. This does not make sence. Why wouldn't you be able to only update one attribute?
 Therefore:
 * My routehandler only validates if the title and/or description is available, if not it skips validation and returns an empty body error

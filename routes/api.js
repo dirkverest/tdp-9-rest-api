@@ -204,18 +204,20 @@ router.post('/courses',authenticateUser, [
 router.put('/courses/:id',authenticateUser, [
     // Only check if JSON contains attribute
     check('title')
-        .if(check('title').exists()).exists({ checkNull: true, checkFalsy: true })
+        // .if(check('title').exists()) REMOVED TO MEET PROJECT GUIDELINES
+        .exists({ checkNull: true, checkFalsy: true })
         .withMessage('Please provide a title for your course.'),
     check('description')
-        .if(check('description').exists()).exists({ checkNull: true, checkFalsy: true })
+        // .if(check('description').exists()) REMOVED TO MEET PROJECT GUIDELINES
+        .exists({ checkNull: true, checkFalsy: true })
         .withMessage('Please provide a description for your course.')
 ], asyncHandler( async (req, res) => {
     const valErrors = validationResult(req);
     const updateCourse = await Course.findByPk(req.params.id);
-    // If body is empty, return missing data error
-    if (JSON.stringify(req.body) === "{}" || JSON.stringify(req.body) === "") {
-        res.status(400).json({ errors: 'Your request body is empty.' });
-    }
+    // If body is empty, return missing data error REMOVED TO MEET PROJECT GUIDELINES
+    // if (JSON.stringify(req.body) === "{}" || JSON.stringify(req.body) === "") {
+    //     res.status(400).json({ errors: 'Your request body is empty.' });
+    // }
     // If course exists, else return 404 error
     if (updateCourse.userId === req.currentUser.id) {
         if (updateCourse) {
