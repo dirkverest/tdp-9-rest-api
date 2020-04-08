@@ -247,7 +247,7 @@ router.delete('/courses/:id',authenticateUser, asyncHandler( async (req, res) =>
             res.status(404).json({ message: `Course with id: ${req.params.id} was not found.`});
         }
     } else {
-        res.status(403).json({ message: `Sorry ${req.currentUser.firstName}, you can only deleter your own courses.`});
+        res.status(403).json({ message: `Sorry ${req.currentUser.firstName}, you can only delete your own courses.`});
     }
 }));
 
